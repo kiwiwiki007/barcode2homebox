@@ -30,19 +30,19 @@ python backend/app.py
 
 ## Docker 部署（推荐：公共镜像，一行启动）
 
-镜像已发布到 GitHub Container Registry，任何装有 Docker 的电脑都能直接拉取运行，**无需克隆代码、无需本地构建**：
+镜像已发布到 GitHub Container Registry，任何装有 Docker 的电脑都能直接拉取运行，**无需克隆代码、无需本地构建、无需 .env 文件**：
 
 ```bash
-# 1) 准备配置（复制仓库里的 .env.example 为 .env 并填入你的 Homebox/GS1 信息）
-cp .env.example .env
-# 2) 启动（docker-compose.yml 使用 ghcr.io/wuqiyu007/barcode2homebox:latest）
+# 1) 编辑同目录的 docker-compose.yml，在 environment 区块把示例默认值改成你的真实值
+#    （至少填 HOMEBOX_URL、GS1_SECRET_ID、GS1_SECRET_KEY；其余按需）
+# 2) 启动
 docker compose up -d
 # 访问 http://<本机IP>:8000
 ```
 
-> 镜像默认 **public**，`docker pull` 无需登录。环境变量通过同目录 `.env` 注入（也可直接写进 compose 的 `environment` 区块）。
+> 镜像默认 **public**，`docker pull` 无需登录。所有配置直接写在 `docker-compose.yml` 的 `environment` 区块，改完文件即生效，**不依赖任何 `.env`**。
 
-docker-compose.yml 核心（开箱即用，仅需改 `.env`）：
+docker-compose.yml 核心（开箱即用，仅需改 environment 里的几个值）：
 
 ```yaml
 services:
@@ -50,7 +50,20 @@ services:
     image: ghcr.io/wuqiyu007/barcode2homebox:latest
     container_name: barcode2homebox
     restart: always
-    env_file: .env
+    environment:
+      - HOMEBOX_URL=https://homebox.example.com:666
+      - HOMEBOX_TOKEN=
+      - APP_SECRET=change-me-to-a-random-32byte-hex
+      - HOMEBOX_EMAIL=
+      - HOMEBOX_PASSWORD=
+      - HOMEBOX_LOCATION_ID=
+      - HOMEBOX_TIMEOUT=30
+      - GS1_API_URL=http://ap-guangzhou.cloudmarket-apigw.com/service-8lp6ruw0/getBarcode
+      - GS1_SECRET_ID=
+      - GS1_SECRET_KEY=
+      - VISION_API_URL=
+      - VISION_API_KEY=
+      - VISION_MODEL=gpt-4o-mini
     ports:
       - 8000:8000
     volumes:
@@ -70,10 +83,10 @@ docker compose up -d --build
 > 若走 NAS 局域网 `http://IP:8000`，实时摄像头会被浏览器拦截，此时请用「上传图片」方式（不受限）。
 > 建议用反代 + 证书（如你已有的 example.com 域名）提供 https 后再用摄像头。
 
-## 配置项（`.env` 或 `docker-compose.yml` 的 `environment`）
+## 配置项（写在 `docker-compose.yml` 的 `environment` 里）
 
-> 推荐做法：复制 `.env.example` 为 `.env` 填入真实值，`docker compose` 会自动读取该文件。
-> 也可直接编辑 `docker-compose.yml` 的 `environment` 区块（已用 `${VAR:-默认值}` 写法，不填则走默认值）。**切勿把真实密钥提交到公开仓库。**
+> 所有配置项已直接写在 `docker-compose.yml` 的 `environment` 区块（见上方示例），把示例默认值改成你的真实值即可，`docker compose up -d` 生效。
+> **切勿把真实密钥提交到公开仓库**——基于本仓库二次开发请 fork 到私仓，不要把填了密钥的 compose 推回公开仓库。
 
 | 变量 | 说明 | 默认值 |
 |---|---|---|

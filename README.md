@@ -32,7 +32,8 @@ python backend/app.py
 
 ```bash
 cd barcode2homebox
-cp .env.example .env      # 填好凭据
+# 配置已内联在 docker-compose.yml 的 environment 区块，直接编辑该文件填入你的 Homebox 地址/凭据即可；
+# 也可继续用 .env 文件覆盖（docker compose 会自动读取同目录的 .env，优先级高于下方默认值）。
 docker compose up -d --build
 # 访问 http://<NAS_IP>:8000
 ```
@@ -41,15 +42,21 @@ docker compose up -d --build
 > 若走 NAS 局域网 `http://IP:8000`，实时摄像头会被浏览器拦截，此时请用「上传图片」方式（不受限）。
 > 建议用反代 + 证书（如你已有的 example.com 域名）提供 https 后再用摄像头。
 
-## 配置项（.env）
+## 配置项（docker-compose.yml 的 `environment` / 或 `.env`）
 
-| 变量 | 说明 |
-|---|---|
-| `HOMEBOX_URL` | Homebox 地址，如 `https://hass.example.com:666` |
-| `HOMEBOX_TOKEN` | 直接给 token（推荐）；或填账号密码自动登录 |
-| `HOMEBOX_LOCATION_ID` | 可选，物品归属位置 |
-| `GS1_API_URL` / `GS1_SECRET_ID` / `GS1_SECRET_KEY` | 云市场官方 GS1 接口（兜底，国货/非食品覆盖） |
-| `VISION_API_URL` / `VISION_API_KEY` / `VISION_MODEL` | 可选 AI 识图兜底（OpenAI 兼容） |
+> 所有配置项已内联到 `docker-compose.yml` 的 `environment` 区块（含示例默认值）。
+> 直接编辑该文件填入你的真实值即可；也可保留一个 `.env` 文件覆盖（docker compose 会先读同目录 `.env`，再 fallback 到 compose 里的默认值）。**切勿把真实密钥提交到公开仓库。**
+
+| 变量 | 说明 | 默认值 |
+|---|---|---|
+| `HOMEBOX_URL` | Homebox 地址，如 `https://hass.example.com:666` | `https://homebox.example.com:666` |
+| `HOMEBOX_TOKEN` | 直接给 token（推荐）；或填账号密码自动登录 | 空 |
+| `APP_SECRET` | 会话 cookie 签名密钥，固定值避免重启后强制登出 | `change-me-to-a-random-32byte-hex` |
+| `HOMEBOX_EMAIL` / `HOMEBOX_PASSWORD` | 账号密码登录（无 token 时使用） | 空 |
+| `HOMEBOX_LOCATION_ID` | 可选，物品归属位置 | 空 |
+| `HOMEBOX_TIMEOUT` | Homebox 请求超时（秒） | `30` |
+| `GS1_API_URL` / `GS1_SECRET_ID` / `GS1_SECRET_KEY` | 云市场官方 GS1 接口（兜底，国货/非食品覆盖） | 见文件内示例 |
+| `VISION_API_URL` / `VISION_API_KEY` / `VISION_MODEL` | 可选 AI 识图兜底（OpenAI 兼容） | `VISION_MODEL`=`gpt-4o-mini` |
 
 ### 获取云市场 GS1 接口
 阿里云市场 / 腾讯云市场搜索「商品条码查询」，购买后拿到调用地址、SecretId 和 SecretKey，填入 `GS1_API_URL`、`GS1_SECRET_ID` 与 `GS1_SECRET_KEY`。

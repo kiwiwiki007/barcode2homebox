@@ -28,24 +28,52 @@ python backend/app.py
 # 浏览器打开 http://localhost:8000
 ```
 
-## Docker 部署（绿联 NAS 等）
+## Docker 部署（推荐：公共镜像，一行启动）
+
+镜像已发布到 GitHub Container Registry，任何装有 Docker 的电脑都能直接拉取运行，**无需克隆代码、无需本地构建**：
+
+```bash
+# 1) 准备配置（复制仓库里的 .env.example 为 .env 并填入你的 Homebox/GS1 信息）
+cp .env.example .env
+# 2) 启动（docker-compose.yml 使用 ghcr.io/wuqiyu007/barcode2homebox:latest）
+docker compose up -d
+# 访问 http://<本机IP>:8000
+```
+
+> 镜像默认 **public**，`docker pull` 无需登录。环境变量通过同目录 `.env` 注入（也可直接写进 compose 的 `environment` 区块）。
+
+docker-compose.yml 核心（开箱即用，仅需改 `.env`）：
+
+```yaml
+services:
+  barcode2homebox:
+    image: ghcr.io/wuqiyu007/barcode2homebox:latest
+    container_name: barcode2homebox
+    restart: always
+    env_file: .env
+    ports:
+      - 8000:8000
+    volumes:
+      - ./data:/app/data
+```
+
+## Docker 部署（本地构建，适合二次开发）
 
 ```bash
 cd barcode2homebox
-# 配置已内联在 docker-compose.yml 的 environment 区块，直接编辑该文件填入你的 Homebox 地址/凭据即可；
-# 也可继续用 .env 文件覆盖（docker compose 会自动读取同目录的 .env，优先级高于下方默认值）。
+cp .env.example .env
 docker compose up -d --build
-# 访问 http://<NAS_IP>:8000
+# 访问 http://<本机IP>:8000
 ```
 
 > ⚠️ **摄像头需要安全上下文**：浏览器仅在 `https://` 或 `localhost` 下允许调用摄像头。
 > 若走 NAS 局域网 `http://IP:8000`，实时摄像头会被浏览器拦截，此时请用「上传图片」方式（不受限）。
 > 建议用反代 + 证书（如你已有的 example.com 域名）提供 https 后再用摄像头。
 
-## 配置项（docker-compose.yml 的 `environment` / 或 `.env`）
+## 配置项（`.env` 或 `docker-compose.yml` 的 `environment`）
 
-> 所有配置项已内联到 `docker-compose.yml` 的 `environment` 区块（含示例默认值）。
-> 直接编辑该文件填入你的真实值即可；也可保留一个 `.env` 文件覆盖（docker compose 会先读同目录 `.env`，再 fallback 到 compose 里的默认值）。**切勿把真实密钥提交到公开仓库。**
+> 推荐做法：复制 `.env.example` 为 `.env` 填入真实值，`docker compose` 会自动读取该文件。
+> 也可直接编辑 `docker-compose.yml` 的 `environment` 区块（已用 `${VAR:-默认值}` 写法，不填则走默认值）。**切勿把真实密钥提交到公开仓库。**
 
 | 变量 | 说明 | 默认值 |
 |---|---|---|

@@ -1,43 +1,37 @@
 services:
   barcode2homebox:
-    image: barcode2homebox
+    # 公开镜像，来自 GitHub Container Registry，其他电脑可直接拉取部署（无需克隆/构建）
+    image: ghcr.io/wuqiyu007/barcode2homebox:latest
     container_name: barcode2homebox
-    ports:
-      - "8000:8000"
+    restart: always
     environment:
       # ===== Homebox 连接 =====
       # 内网示例：http://homebox:7745   公网示例：https://homebox.example.com:666
-      HOMEBOX_URL: ${HOMEBOX_URL:-https://homebox.example.com:666}
+      - HOMEBOX_URL=${HOMEBOX_URL:-https://homebox.example.com:666}
       # 留空则由应用用下方账号密码登录；若填了长期 token 则优先用 token
-      HOMEBOX_TOKEN: ${HOMEBOX_TOKEN:-}
+      - HOMEBOX_TOKEN=${HOMEBOX_TOKEN:-}
       # 会话 cookie 签名密钥；固定值可避免容器重启后用户被强制登出
       # 可用 `python -c "import secrets;print(secrets.token_hex(32))"` 生成
-      APP_SECRET: ${APP_SECRET:-change-me-to-a-random-32byte-hex}
-      HOMEBOX_EMAIL: ${HOMEBOX_EMAIL:-}
-      HOMEBOX_PASSWORD: ${HOMEBOX_PASSWORD:-}
-      HOMEBOX_LOCATION_ID: ${HOMEBOX_LOCATION_ID:-}
+      - APP_SECRET=${APP_SECRET:-change-me-to-a-random-32byte-hex}
+      - HOMEBOX_EMAIL=${HOMEBOX_EMAIL:-}
+      - HOMEBOX_PASSWORD=${HOMEBOX_PASSWORD:-}
+      - HOMEBOX_LOCATION_ID=${HOMEBOX_LOCATION_ID:-}
       # Homebox 请求超时（秒）；走内网时给足余量，避免偶发超时导致登录失败
-      HOMEBOX_TIMEOUT: ${HOMEBOX_TIMEOUT:-30}
+      - HOMEBOX_TIMEOUT=${HOMEBOX_TIMEOUT:-30}
       # ===== 商品数据源 =====
       # 腾讯云市场官方 GS1 接口（中国物品编码中心数据），国货/非食品兜底。
       # 购买地址：https://market.cloud.tencent.com/products/20577
-      GS1_API_URL: ${GS1_API_URL:-http://ap-guangzhou.cloudmarket-apigw.com/service-8lp6ruw0/getBarcode}
-      GS1_SECRET_ID: ${GS1_SECRET_ID:-}
-      GS1_SECRET_KEY: ${GS1_SECRET_KEY:-}
+      - GS1_API_URL=${GS1_API_URL:-http://ap-guangzhou.cloudmarket-apigw.com/service-8lp6ruw0/getBarcode}
+      - GS1_SECRET_ID=${GS1_SECRET_ID:-}
+      - GS1_SECRET_KEY=${GS1_SECRET_KEY:-}
       # ===== AI 识图兜底（可选）=====
       # 完全查不到条码时，调用 OpenAI 兼容视觉接口识别包装图。
-      VISION_API_URL: ${VISION_API_URL:-}
-      VISION_API_KEY: ${VISION_API_KEY:-}
-      VISION_MODEL: ${VISION_MODEL:-gpt-4o-mini}
-    restart: unless-stopped
+      - VISION_API_URL=${VISION_API_URL:-}
+      - VISION_API_KEY=${VISION_API_KEY:-}
+      - VISION_MODEL=${VISION_MODEL:-gpt-4o-mini}
+    ports:
+      - 8000:8000
     # 后端通过 HOMEBOX_URL（公网或内网地址）连接 Homebox，无需额外网络配置。
-    # 若 Homebox 与本项目在同一台 Docker 主机，可取消下方注释加入其网络实现内网互通：
-    #   networks:
-    #     - default
-    #     - homebox_default
-    # networks:
-    #   homebox_default:
-    #     external: true
     # 设置页填写的 GS1/Vision 配置持久化到此卷，容器重建不丢
     volumes:
       - ./data:/app/data

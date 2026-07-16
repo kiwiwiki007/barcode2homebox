@@ -86,8 +86,8 @@ def lookup_gs1(barcode: str) -> dict | None:
     url = c.get("gs1_api_url")
     if not url:
         return None
-    secret_id = c.get("gs1_secret_id")
-    secret_key = c.get("gs1_secret_key")
+    secret_id = (c.get("gs1_secret_id") or "").strip()
+    secret_key = (c.get("gs1_secret_key") or "").strip()
     if not secret_id or not secret_key:
         log.warning("GS1_API_URL set but GS1_SECRET_ID/SECRET_KEY missing")
         return None

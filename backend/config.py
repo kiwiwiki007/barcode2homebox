@@ -54,8 +54,18 @@ def load() -> dict:
 
 
 def save(cfg: dict) -> dict:
-    """只持久化已知键；空值显式写为空串，便于「清空某配置」。"""
-    data = {k: (cfg.get(k) or "") for k in DEFAULTS}
+    """只持久化已知键；空值显式写为空串，便于「清空某配置」。
+
+    凭据类字段（密钥/ID/API Key）在保存时即去除首尾空白，
+    避免从网页/剪贴板复制时带入的尾随空格导致签名失败（测试通过、实查回落的假阳性）。
+    """
+    _strip_keys = {"gs1_secret_id", "gs1_secret_key", "vision_api_key"}
+    data = {}
+    for k in DEFAULTS:
+        v = cfg.get(k) or ""
+        if k in _strip_keys and isinstance(v, str):
+            v = v.strip()
+        data[k] = v
     with _lock:
         CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
         CONFIG_PATH.write_text(

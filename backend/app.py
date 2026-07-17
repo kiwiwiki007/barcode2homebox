@@ -336,6 +336,13 @@ def api_lookup(payload: dict, _: None = Depends(require_auth)):
 @app.post("/api/add")
 def api_add(payload: dict, token: str = Depends(require_token)):
     barcode = str(payload.get("barcode", "")).strip()
+    # 入库数量：解析为正整数，非法/缺省归 1
+    try:
+        quantity = int(payload.get("quantity"))
+    except (TypeError, ValueError):
+        quantity = 1
+    if quantity is None or quantity < 1:
+        quantity = 1
     if barcode:
         product = lookup.lookup(barcode)
         if not product.get("found"):
@@ -357,7 +364,7 @@ def api_add(payload: dict, token: str = Depends(require_token)):
     if not product.get("name"):
         raise HTTPException(400, "name required")
     location_id = payload.get("locationId")  # 前端选择的位置
-    result = hb.add_item(token, product, location_id=location_id)
+    result = hb.add_item(token, product, location_id=location_id, quantity=quantity)
     return {"product": product, "homebox": result}
 
 

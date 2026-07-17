@@ -386,6 +386,7 @@ function showResult(product, barcode, decodedBy) {
 
   const found = product && product.found;
   $("rName").textContent = found ? product.name : "未找到商品";
+  $("qtyInput").value = 1; // 每次新结果显示，数量重置为 1
 
   let meta = "";
   if (found) {
@@ -414,7 +415,10 @@ $("addBtn").onclick = async () => {
   const btn = $("addBtn");
   btn.disabled = true;
   setStatus("addStatus", "⏳ 正在录入…", "");
-  const payload = { barcode: lastBarcode || "" };
+  // 入库数量：解析为正整数，非法/缺省归 1
+  let qty = parseInt($("qtyInput").value, 10);
+  if (!Number.isFinite(qty) || qty < 1) qty = 1;
+  const payload = { barcode: lastBarcode || "", quantity: qty };
   const locId = $("locationSelect").value;
   if (locId) payload.locationId = locId;
   if (lastProduct && lastProduct.found) {
@@ -444,7 +448,7 @@ $("addBtn").onclick = async () => {
     if (d.homebox && d.homebox.ok) {
       setStatus("addStatus", "✅ 录入成功！", "ok");
       btn.disabled = true;
-      setTimeout(() => { $("result").classList.remove("show"); $("emptyState").style.display = ""; }, 2000);
+      setTimeout(() => { clearResult(); }, 1200);
     } else {
       setStatus("addStatus", "录入失败: " + (d.homebox?.error || JSON.stringify(d)), "err");
     }
@@ -453,6 +457,16 @@ $("addBtn").onclick = async () => {
   }
   btn.disabled = false;
 };
+
+// ---- 录入后清空结果，便于连续扫码 ----
+function clearResult() {
+  $("result").classList.remove("show");
+  $("emptyState").style.display = "";
+  $("addStatus").textContent = "";
+  $("qtyInput").value = 1;
+  lastProduct = null;
+  lastBarcode = null;
+}
 
 function setStatus(id, msg, cls) {
   const el = $(id);

@@ -184,8 +184,8 @@ def _upload_image(token: str, entity_id: str, image_bytes: bytes, filename: str 
     return None
 
 
-def add_item(token: str, product: dict, location_id: str | None = None) -> dict:
-    """把商品写入 Homebox。返回 {ok, id?, error?}。"""
+def add_item(token: str, product: dict, location_id: str | None = None, quantity: int = 1) -> dict:
+    """把商品写入 Homebox。返回 {ok, id?, error?}。quantity 为入库数量（默认 1）。"""
     if not token:
         return {"ok": False, "error": "no_homebox_token"}
     # 优先使用前端传入的位置，其次用环境变量配置
@@ -212,7 +212,7 @@ def add_item(token: str, product: dict, location_id: str | None = None) -> dict:
         payload = {
             "name": product["name"],
             "description": description,
-            "quantity": 1,
+            "quantity": quantity,
         }
         if type_id:
             payload["entityTypeId"] = type_id
@@ -231,7 +231,7 @@ def add_item(token: str, product: dict, location_id: str | None = None) -> dict:
         put_body = {
             "name": product["name"],
             "description": description,
-            "quantity": 1,
+            "quantity": quantity,
             "notes": notes,
         }
         if product.get("barcode"):
@@ -265,7 +265,7 @@ def add_item(token: str, product: dict, location_id: str | None = None) -> dict:
         }
 
     elif version == "v1":
-        payload = {"name": product["name"], "description": description}
+        payload = {"name": product["name"], "description": description, "quantity": quantity}
         if loc:
             payload["locationId"] = loc
         r = requests.post(f"{BASE}/api/v1/items", json=payload, headers=h, timeout=TIMEOUT, verify=False)

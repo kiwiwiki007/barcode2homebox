@@ -30,7 +30,6 @@ async function checkAuth() {
     const d = await r.json();
     if (d.authenticated) {
       hideLogin();
-      $("whoEmail").textContent = d.email || "";
       loadLocations();
     } else {
       showLogin();
@@ -58,7 +57,6 @@ $("loginBtn").onclick = async () => {
     if (r.ok && d.ok) {
       $("loginPassword").value = "";
       hideLogin();
-      $("whoEmail").textContent = d.email || email;
       loadLocations();
       setStatus("loginStatus", "", "");
     } else {
@@ -378,7 +376,6 @@ function showResult(product, barcode, decodedBy) {
   lastProduct = product;
   if (barcode) lastBarcode = barcode;
   $("result").classList.add("show");
-  $("emptyState").style.display = "none";
 
   const imgSrc = product.image ? "/api/proxy-image?url=" + encodeURIComponent(product.image) : "";
   $("rImg").src = imgSrc;
@@ -461,7 +458,6 @@ $("addBtn").onclick = async () => {
 // ---- 录入后清空结果，便于连续扫码 ----
 function clearResult() {
   $("result").classList.remove("show");
-  $("emptyState").style.display = "";
   $("addStatus").textContent = "";
   $("qtyInput").value = 1;
   lastProduct = null;

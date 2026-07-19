@@ -50,6 +50,7 @@ services:
     image: ghcr.io/wuqiyu007/barcode2homebox:latest
     container_name: barcode2homebox
     restart: always
+    pull_policy: always   # 强制每次 up 都拉取最新 latest，避免本地旧镜像不更新
     environment:
       - HOMEBOX_URL=https://homebox.example.com:666
       - HOMEBOX_TOKEN=
@@ -69,6 +70,8 @@ services:
     volumes:
       - ./data:/app/data
 ```
+
+> ⚠️ **务必保留 `pull_policy: always`**：`image` 用 `:latest` 标签时，Docker **不会**自动重新拉取——只要本地已存在同名 `latest` 镜像，`docker compose up -d` 会直接复用旧镜像，导致「看起来更新了其实没更」。加上 `pull_policy: always` 后，每次 `up` 都会先拉最新镜像再重建。更新版本时只需 `docker compose up -d` 即可。
 
 ## Docker 部署（本地构建，适合二次开发）
 

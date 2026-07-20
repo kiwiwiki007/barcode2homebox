@@ -68,95 +68,10 @@ def require_auth(request: Request):
         raise HTTPException(status_code=401, detail="未登录或登录已失效，请先登录")
 
 
-# ---------- 启动迁移：把 docker-compose 里的 HOMEBOX_* 迁移进 config.json ----------
-try:
-    if cfg.migrate_env_to_config():
-        log.info("migrated HOMEBOX_* env vars into config.json")
-except Exception as e:  # noqa: BLE001
-    log.warning("homebox env migration skipped: %s", e)
-
-
 # ---------- 公开端点 ----------
 @app.get("/api/health")
 def health():
     return {"ok": True, "homebox_configured": hb.is_configured()}
-
-
-# ---------- Homebox 连接配置（公开：登录前即可设置，解决「登录需要 URL 但设置需登录」的循环依赖）----------
-@app.get("/api/homebox")
-def api_get_homebox():
-    """返回当前 Homebox 连接信息（地址/超时/位置来自 docker-compose，只读；
-    token 不返回明文，仅给是否已配置标记）。"""
-    c = cfg.load()
-    return {
-        "homebox_url": c.get("homebox_url", ""),
-        "homebox_timeout": c.get("homebox_timeout", "30") or "30",
-        "homebox_location_id": c.get("homebox_location_id", ""),
-        "has_token": bool(c.get("homebox_token")),
-        "configured": bool(c.get("homebox_url")),
-    }
-
-
-@app.put("/api/homebox")
-def api_put_homebox(payload: dict):
-    """保存 Homebox 长期 Token（公开）。地址/超时/位置仍在 docker-compose 里，不在此持久化。
-    仅在 payload 含 homebox_token 键时更新；传 clear_token=true 则清空。
-    """
-    cur = cfg.load()
-    if "homebox_token" in payload:
-        if payload.get("clear_token"):
-            cur["homebox_token"] = ""
-        else:
-            cur["homebox_token"] = (payload.get("homebox_token") or "").strip()
-    saved = cfg.save(cur)
-    return {
-        "ok": True,
-        "has_token": bool(saved.get("homebox_token")),
-    }
-
-
-@app.post("/api/homebox/test")
-def api_test_homebox(payload: dict):
-    """测试 Homebox 连接（公开，免登录）。
-    地址/超时来自 docker-compose；可选传入 homebox_token / email+password 做鉴权测试。
-    返回 {ok, reachable, authed?, auth_method?, error?}。
-    """
-    base, timeout = hb.base(), hb.timeout()
-    if not base:
-        return {"ok": False, "error": "未配置 Homebox 服务器地址（请在 docker-compose 设置 HOMEBOX_URL）"}
-
-    # 1) 网络可达性（能拿到任何 HTTP 响应即视为可达，连接异常才算失败）
-    try:
-        requests.get(base, timeout=timeout, verify=False, allow_redirects=True)
-    except Exception as e:  # noqa: BLE001
-        return {"ok": False, "error": f"无法连接到 {base}：{e}"}
-
-    c = cfg.load()
-    token = (payload.get("homebox_token") or "").strip() or c.get("homebox_token", "")
-    email = (payload.get("email") or "").strip()
-    password = payload.get("password") or ""
-
-    # 2) 鉴权测试（可选）
-    if token:
-        h = {"Authorization": f"Bearer {token}"}
-        try:
-            r = requests.get(f"{base}/api/v1/items?pageSize=1", headers=h, timeout=timeout, verify=False)
-            if r.status_code == 200:
-                return {"ok": True, "reachable": True, "authed": True, "auth_method": "token"}
-            return {"ok": False, "reachable": True, "authed": False,
-                    "error": f"Token 无效（HTTP {r.status_code}）"}
-        except Exception as e:  # noqa: BLE001
-            return {"ok": False, "reachable": True, "authed": False, "error": str(e)}
-
-    if email and password:
-        res = hb.login(email, password)
-        if res.get("ok"):
-            return {"ok": True, "reachable": True, "authed": True, "auth_method": "login", "email": email}
-        return {"ok": False, "reachable": True, "authed": False,
-                "error": "账号或密码错误：" + str(res.get("error", ""))}
-
-    return {"ok": True, "reachable": True, "authed": False,
-            "note": "仅测试了网络可达性，未做账号鉴权（填入 Token 或账号密码可进一步验证）"}
 
 
 @app.post("/api/login")

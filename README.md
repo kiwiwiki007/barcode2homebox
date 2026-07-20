@@ -53,10 +53,7 @@ services:
     pull_policy: always   # 强制每次 up 都拉取最新 latest，避免本地旧镜像不更新
     environment:
       - HOMEBOX_URL=https://homebox.example.com:666
-      - HOMEBOX_TOKEN=
       - APP_SECRET=change-me-to-a-random-32byte-hex
-      - HOMEBOX_EMAIL=
-      - HOMEBOX_PASSWORD=
       - HOMEBOX_LOCATION_ID=
       - HOMEBOX_TIMEOUT=30
       - GS1_API_URL=http://ap-guangzhou.cloudmarket-apigw.com/service-8lp6ruw0/getBarcode
@@ -93,10 +90,8 @@ docker compose up -d --build
 
 | 变量 | 说明 | 默认值 |
 |---|---|---|
-| `HOMEBOX_URL` | Homebox 地址，如 `https://homebox.example.com:666` | `https://homebox.example.com:666` |
-| `HOMEBOX_TOKEN` | 直接给 token（推荐）；或填账号密码自动登录 | 空 |
+| `HOMEBOX_URL` | Homebox 地址，如 `https://homebox.example.com:666`（**必填，其余均可不填**） | `https://homebox.example.com:666` |
 | `APP_SECRET` | 会话 cookie 签名密钥，固定值避免重启后强制登出 | `change-me-to-a-random-32byte-hex` |
-| `HOMEBOX_EMAIL` / `HOMEBOX_PASSWORD` | 账号密码登录（无 token 时使用） | 空 |
 | `HOMEBOX_LOCATION_ID` | 可选，物品归属位置 | 空 |
 | `HOMEBOX_TIMEOUT` | Homebox 请求超时（秒） | `30` |
 | `GS1_API_URL` / `GS1_SECRET_ID` / `GS1_SECRET_KEY` | 云市场官方 GS1 接口（兜底，国货/非食品覆盖） | 见文件内示例 |

@@ -113,12 +113,6 @@ function loadSettingsIntoPage() {
   $("gs1TestResult").className = "test-result";
   $("visionTestResult").textContent = "";
   $("visionTestResult").className = "test-result";
-  $("hbTestResult2").textContent = "";
-  $("hbTestResult2").className = "test-result";
-  $("setHbUrl").value = "";
-  $("setHbToken").value = "";
-  $("hbTokenHint").textContent = "";
-  $("clearHbToken").style.display = "none";
   apiFetch("/api/settings")
     .then((r) => r.json())
     .then((d) => {
@@ -130,20 +124,6 @@ function loadSettingsIntoPage() {
       $("setVisionModel").value = d.vision_model || "gpt-4o-mini";
     })
     .catch((e) => { if (e.message !== "未登录") setStatus("settingsStatus", "加载失败: " + e.message, "err"); });
-  // Homebox 连接：地址来自 docker-compose（只读），Token 来自设置（可改）
-  fetch("/api/homebox", { credentials: "same-origin" })
-    .then((r) => r.json())
-    .then((d) => {
-      $("setHbUrl").value = d.homebox_url || "(未配置 HOMEBOX_URL)";
-      if (d.has_token) {
-        $("hbTokenHint").textContent = "（已保存）";
-        $("clearHbToken").style.display = "inline-flex";
-      } else {
-        $("hbTokenHint").textContent = "（留空则用账号密码登录）";
-        $("clearHbToken").style.display = "none";
-      }
-    })
-    .catch(() => {});
 }
 
 $("testGs1").onclick = async () => {
@@ -220,7 +200,6 @@ $("saveSettings").onclick = async () => {
     vision_api_key: $("setVisionKey").value,
     vision_model: $("setVisionModel").value.trim() || "gpt-4o-mini",
   };
-  const hbToken = $("setHbToken").value;
   $("saveSettings").disabled = true;
   setStatus("settingsStatus", "保存中…", "");
   try {
@@ -235,76 +214,12 @@ $("saveSettings").onclick = async () => {
       $("saveSettings").disabled = false;
       return;
     }
-    // 保存 Homebox 长期 Token（仅在有填写时发送；留空则保持原有配置）
-    if (hbToken) {
-      const r2 = await fetch("/api/homebox", {
-        method: "PUT",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ homebox_token: hbToken }),
-      });
-      const d2 = await r2.json();
-      if (!d2.ok) {
-        setStatus("settingsStatus", "Token 保存失败", "err");
-        $("saveSettings").disabled = false;
-        return;
-      }
-    }
     setStatus("settingsStatus", "✅ 已保存", "ok");
     setTimeout(() => showView("scan"), 900);
   } catch (e) {
     if (e.message !== "未登录") setStatus("settingsStatus", "请求失败: " + e.message, "err");
   }
   $("saveSettings").disabled = false;
-};
-
-// ---------- Homebox Token 测试 / 清除 ----------
-$("testHomebox").onclick = async () => {
-  const token = $("setHbToken").value.trim();
-  $("testHomebox").disabled = true;
-  $("hbTestResult2").textContent = "测试中…";
-  $("hbTestResult2").className = "test-result";
-  try {
-    const r = await fetch("/api/homebox/test", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(token ? { homebox_token: token } : {}),
-    });
-    const d = await r.json();
-    if (d.ok) {
-      let msg = "● 连接正常";
-      if (d.authed) msg += "（已鉴权·" + (d.auth_method === "token" ? "Token" : "账号") + "）";
-      else if (d.note) msg += "（仅网络可达）";
-      $("hbTestResult2").textContent = msg;
-      $("hbTestResult2").className = "test-result ok";
-    } else {
-      $("hbTestResult2").textContent = "✕ " + (d.error || "连接失败");
-      $("hbTestResult2").className = "test-result err";
-    }
-  } catch (e) {
-    $("hbTestResult2").textContent = "✕ " + e.message;
-    $("hbTestResult2").className = "test-result err";
-  }
-  $("testHomebox").disabled = false;
-};
-
-$("clearHbToken").onclick = async () => {
-  if (!confirm("确定清除已保存的 Homebox Token？")) return;
-  try {
-    const r = await fetch("/api/homebox", {
-      method: "PUT",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clear_token: true }),
-    });
-    const d = await r.json();
-    if (d.ok) {
-      $("setHbToken").value = "";
-      $("hbTokenHint").textContent = "（留空则用账号密码登录）";
-      $("clearHbToken").style.display = "none";
-    }
-  } catch (_) {}
 };
 
 // ---- 位置列表 ----

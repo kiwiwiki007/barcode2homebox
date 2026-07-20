@@ -2,19 +2,17 @@ services:
   barcode2homebox:
     # 公开镜像，来自 GitHub Container Registry，其他电脑可直接拉取部署（无需克隆/构建）
     image: ghcr.io/kiwiwiki007/barcode2homebox:latest
+    pull_policy: always   # 强制每次 up 都拉取最新 latest，避免本地旧镜像不更新
     container_name: barcode2homebox
     restart: always
     environment:
-      # ===== Homebox 连接 =====
+      # ===== Homebox 连接（只需填 HOMEBOX_URL，其余均可不填）=====
       # 改成你的 Homebox 地址（内网示例 http://homebox:7745 / 公网示例 https://homebox.example.com:666）
       - HOMEBOX_URL=https://homebox.example.com:666
-      # 留空则由应用用下方账号密码登录；若填了长期 token 则优先用 token
-      - HOMEBOX_TOKEN=
       # 会话 cookie 签名密钥；固定值可避免容器重启后用户被强制登出
       # 用 `python -c "import secrets;print(secrets.token_hex(32))"` 生成后填入
       - APP_SECRET=change-me-to-a-random-32byte-hex
-      - HOMEBOX_EMAIL=
-      - HOMEBOX_PASSWORD=
+      # 以下两项为可选覆盖（不填则用代码默认值：超时 30 秒、物品默认无位置）
       - HOMEBOX_LOCATION_ID=
       # Homebox 请求超时（秒）
       - HOMEBOX_TIMEOUT=30

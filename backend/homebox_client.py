@@ -1,13 +1,12 @@
 """Homebox REST 客户端：自动适配 v1(/items) 与 v2(/entities) API，JWT 鉴权。
 
-连接配置（地址 / 超时 / 位置 / 长期 Token）自 v1.05 起从运行时配置读取，
-不再依赖模块级全局量；配置优先来自 /app/data/config.json，回退到 HOMEBOX_* 环境变量。
+连接地址 / 超时 / 位置从 docker-compose 环境变量实时读取（不再依赖模块级全局量）。
+实际写入 Homebox 的凭据来自「登录 app 时的账号」（存于会话 cookie），后端无需长期 Token；
+HOMEBOX_URL 等仅在 docker-compose 里配置。
 环境变量：
-  HOMEBOX_URL      例如 https://homebox.example.com:666 或 http://homebox:7745
-  HOMEBOX_TIMEOUT  请求超时（秒）
-  HOMEBOX_TOKEN    直接给 token（可选，配置中 homebox_token 优先）
-  HOMEBOX_LOCATION_ID  可选，指定物品归属位置（配置中 homebox_location_id）
-  HOMEBOX_EMAIL / HOMEBOX_PASSWORD  不给 token 时用于登录获取（仅 env，不持久化）
+  HOMEBOX_URL         例如 https://homebox.example.com:666 或 http://homebox:7745
+  HOMEBOX_TIMEOUT     请求超时（秒）
+  HOMEBOX_LOCATION_ID 可选，指定物品归属位置（环境变量）
 """
 import io
 import os
@@ -22,9 +21,8 @@ log = logging.getLogger("homebox")
 
 
 def _resolve() -> tuple[str, int]:
-    """读取 Homebox 地址与超时。
+    """读取 Homebox 地址与超时（来自 docker-compose 环境变量）。
 
-    地址 / 超时写在 docker-compose（环境变量），不在 config.json；Token 才在 config.json。
     每次调用都重新读取，保证 compose 改动重启后立即生效。
     """
     c = _cfg_load()
@@ -49,31 +47,6 @@ def timeout() -> int:
 def is_configured() -> bool:
     """是否已配置 Homebox 地址。"""
     return bool(base())
-
-
-def get_token() -> str | None:
-    """取一个可用的 Homebox token：配置中的长期 token 优先，否则用环境变量里的账号密码登录。"""
-    c = _cfg_load()
-    token = (c.get("homebox_token") or "").strip() or os.getenv("HOMEBOX_TOKEN")
-    if token:
-        return token
-    email = os.getenv("HOMEBOX_EMAIL")
-    pwd = os.getenv("HOMEBOX_PASSWORD")
-    b, t = _resolve()
-    if not (b and email and pwd):
-        return None
-    try:
-        r = requests.post(
-            f"{b}/api/v1/users/login",
-            json={"username": email, "password": pwd},
-            timeout=t,
-        )
-        if r.status_code == 200:
-            return r.json().get("token")
-        log.warning("Homebox login failed: %s", r.status_code)
-    except Exception as e:  # noqa: BLE001
-        log.warning("Homebox login error: %s", e)
-    return None
 
 
 def login(email: str, password: str) -> dict:
@@ -228,7 +201,7 @@ def _upload_image(token: str, entity_id: str, image_bytes: bytes, filename: str 
 def add_item(token: str, product: dict, location_id: str | None = None, quantity: int = 1) -> dict:
     """把商品写入 Homebox。返回 {ok, id?, error?}。quantity 为入库数量（默认 1）。"""
     if not token:
-        return {"ok": False, "error": "no_homebox_token"}
+        return {"ok": False, "error": "no_token"}
     b, t = _resolve()
     # 优先使用前端传入的位置，其次用 docker-compose 里的默认位置（环境变量）
     loc = location_id or os.getenv("HOMEBOX_LOCATION_ID") or None

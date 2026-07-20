@@ -326,7 +326,7 @@
       <button class="login-btn" id="loginBtn">登录 <span>→</span></button>
       <div class="status" id="loginStatus"></div>
     </div>
-    <div class="login-footer">条码扫码录入 v1.05</div>
+    <div class="login-footer">条码扫码录入 v1.06</div>
   </div>
 
   <div class="header">
@@ -339,7 +339,7 @@
       <div class="title-group">
         <div class="title-row">
           <h1>Homebox 扫码录入</h1>
-          <span class="ver">v1.05</span>
+          <span class="ver">v1.06</span>
         </div>
         <div class="sub">识别商品条码，一键入库 Homebox</div>
       </div>
@@ -466,23 +466,6 @@
     </div>
     <div class="settings-body">
       <div class="settings-section">
-        <h3>Homebox 连接</h3>
-        <p class="settings-hint">服务器地址 / 超时 / 位置在 docker-compose 里配置（只读）。长期 Token 在此填写并保存，重启不丢；留空则用登录账号密码鉴权。</p>
-        <div class="set-field">
-          <label>服务器地址（来自 docker-compose，只读）</label>
-          <input id="setHbUrl" readonly disabled style="opacity:.7;" />
-        </div>
-        <div class="set-field">
-          <label for="setHbToken">长期 Token（可选）<span id="hbTokenHint" style="color:var(--muted);font-weight:400;"></span></label>
-          <input id="setHbToken" type="password" placeholder="hb_xxx，留空则用账号密码登录" autocomplete="off" />
-        </div>
-        <div class="set-test-row">
-          <button class="btn btn-outline" id="testHomebox">测试连接</button>
-          <span class="test-result" id="hbTestResult2"></span>
-          <button class="btn btn-outline" id="clearHbToken" type="button" style="margin-left:auto; display:none;">清除 Token</button>
-        </div>
-      </div>
-      <div class="settings-section">
         <h3>商品数据源</h3>
         <p class="settings-hint">GS1 官方条码接口（腾讯云市场，用于中国条码识别）。Open Food Facts 免费免配置，默认开启。</p>
         <div class="set-field">
@@ -535,6 +518,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=19"></script>
+  <script src="app.js?v=20"></script>
 </body>
 </html>

@@ -363,9 +363,20 @@ def api_add(payload: dict, token: str = Depends(require_token)):
     if barcode:
         product = lookup.lookup(barcode)
         if not product.get("found"):
-            # 允许前端手动补全后直接传 name
+            # 允许前端手动补全或 AI 识图兜底后直接传 name
             if not payload.get("name"):
                 raise HTTPException(404, "未找到该条码商品，请手动填写名称")
+            product = {
+                "found": True,
+                "source": "manual",
+                "barcode": barcode,
+                "name": payload.get("name"),
+                "brand": payload.get("brand"),
+                "specification": payload.get("specification"),
+                "manufacturer": payload.get("manufacturer"),
+                "category": payload.get("category"),
+                "image": payload.get("image"),
+            }
     else:
         product = {
             "found": True,

@@ -376,7 +376,13 @@ async function onBarcode(code) {
 // ---- 结果展示 ----
 function showResult(product, barcode, decodedBy) {
   lastProduct = product;
-  if (barcode) lastBarcode = barcode;
+  if (decodedBy && decodedBy.includes("vision")) {
+    // AI 识图结果：条码以识别结果本身为准；纯 AI 识别无条码时应清空旧条码，
+    // 防止先扫码未命中再 AI 识别时，仍把上一次扫码的条码带进后端导致 404。
+    lastBarcode = product.barcode || "";
+  } else if (barcode) {
+    lastBarcode = barcode;
+  }
   $("result").classList.add("show");
 
   const imgSrc = product.image ? "/api/proxy-image?url=" + encodeURIComponent(product.image) : "";
@@ -425,8 +431,8 @@ $("addBtn").onclick = async () => {
   if (lastProduct && lastProduct.found) {
     const bc = lastProduct.barcode || lastBarcode || "";
     payload.barcode = bc;
-    // 纯 AI 识别（无条码）场景：把 AI 识别的字段一并发后端入库，保证与条码识别结果一致
-    if (!bc && lastProduct.source === "vision-ai") {
+    // AI 识图结果：把名称/品牌/规格/厂家/品类一并传给后端，避免条码兜底后丢失 AI 识别信息
+    if (lastProduct.source === "vision-ai") {
       payload.name = lastProduct.name;
       payload.brand = lastProduct.brand;
       payload.specification = lastProduct.specification;

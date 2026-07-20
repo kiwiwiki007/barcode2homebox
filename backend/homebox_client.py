@@ -1,9 +1,13 @@
 """Homebox REST 客户端：自动适配 v1(/items) 与 v2(/entities) API，JWT 鉴权。
+
+连接配置（地址 / 超时 / 位置 / 长期 Token）自 v1.05 起从运行时配置读取，
+不再依赖模块级全局量；配置优先来自 /app/data/config.json，回退到 HOMEBOX_* 环境变量。
 环境变量：
   HOMEBOX_URL      例如 https://homebox.example.com:666 或 http://homebox:7745
-  HOMEBOX_TOKEN    直接给 token（可选）
-  HOMEBOX_EMAIL / HOMEBOX_PASSWORD  不给 token 时用于登录获取
-  HOMEBOX_LOCATION_ID  可选，指定物品归属位置
+  HOMEBOX_TIMEOUT  请求超时（秒）
+  HOMEBOX_TOKEN    直接给 token（可选，配置中 homebox_token 优先）
+  HOMEBOX_LOCATION_ID  可选，指定物品归属位置（配置中 homebox_location_id）
+  HOMEBOX_EMAIL / HOMEBOX_PASSWORD  不给 token 时用于登录获取（仅 env，不持久化）
 """
 import io
 import os
@@ -12,25 +16,57 @@ import requests
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+from config import load as _cfg_load
+
 log = logging.getLogger("homebox")
 
-BASE = os.getenv("HOMEBOX_URL", "").rstrip("/")
-TIMEOUT = int(os.getenv("HOMEBOX_TIMEOUT", "30"))
+
+def _resolve() -> tuple[str, int]:
+    """读取 Homebox 地址与超时。
+
+    地址 / 超时写在 docker-compose（环境变量），不在 config.json；Token 才在 config.json。
+    每次调用都重新读取，保证 compose 改动重启后立即生效。
+    """
+    c = _cfg_load()
+    base = (c.get("homebox_url") or os.getenv("HOMEBOX_URL") or "").strip().rstrip("/")
+    try:
+        timeout = int((c.get("homebox_timeout") or os.getenv("HOMEBOX_TIMEOUT") or 30) or 30)
+    except (TypeError, ValueError):
+        timeout = 30
+    return base, timeout
+
+
+def base() -> str:
+    """当前 Homebox 基础地址（去掉末尾斜杠）。"""
+    return _resolve()[0]
+
+
+def timeout() -> int:
+    """当前 Homebox 请求超时（秒）。"""
+    return _resolve()[1]
+
+
+def is_configured() -> bool:
+    """是否已配置 Homebox 地址。"""
+    return bool(base())
 
 
 def get_token() -> str | None:
-    token = os.getenv("HOMEBOX_TOKEN")
+    """取一个可用的 Homebox token：配置中的长期 token 优先，否则用环境变量里的账号密码登录。"""
+    c = _cfg_load()
+    token = (c.get("homebox_token") or "").strip() or os.getenv("HOMEBOX_TOKEN")
     if token:
         return token
     email = os.getenv("HOMEBOX_EMAIL")
     pwd = os.getenv("HOMEBOX_PASSWORD")
-    if not (BASE and email and pwd):
+    b, t = _resolve()
+    if not (b and email and pwd):
         return None
     try:
         r = requests.post(
-            f"{BASE}/api/v1/users/login",
+            f"{b}/api/v1/users/login",
             json={"username": email, "password": pwd},
-            timeout=TIMEOUT,
+            timeout=t,
         )
         if r.status_code == 200:
             return r.json().get("token")
@@ -44,13 +80,14 @@ def login(email: str, password: str) -> dict:
     """用 Homebox 账号密码登录，返回 {ok, token?, email?, error?}。
     Homebox v0.26+ 的 LoginForm 使用 username 字段（值是邮箱），返回的 token 带 "Bearer " 前缀。
     """
-    if not (BASE and email and password):
+    b, t = _resolve()
+    if not (b and email and password):
         return {"ok": False, "error": "missing_homebox_url_or_credentials"}
     try:
         r = requests.post(
-            f"{BASE}/api/v1/users/login",
+            f"{b}/api/v1/users/login",
             json={"username": email, "password": password},
-            timeout=TIMEOUT,
+            timeout=t,
             verify=False,
         )
         if r.status_code == 200:
@@ -67,14 +104,15 @@ def login(email: str, password: str) -> dict:
 
 def detect_version(token: str) -> str:
     """探测 Homebox API 版本：v2=entities, v1=items。"""
+    b, t = _resolve()
     h = {"Authorization": f"Bearer {token}"}
     try:
-        if requests.get(f"{BASE}/api/v1/entities?pageSize=1", headers=h, timeout=TIMEOUT, verify=False).status_code == 200:
+        if requests.get(f"{b}/api/v1/entities?pageSize=1", headers=h, timeout=t, verify=False).status_code == 200:
             return "v2"
     except Exception:  # noqa: BLE001
         pass
     try:
-        if requests.get(f"{BASE}/api/v1/items?pageSize=1", headers=h, timeout=TIMEOUT, verify=False).status_code == 200:
+        if requests.get(f"{b}/api/v1/items?pageSize=1", headers=h, timeout=t, verify=False).status_code == 200:
             return "v1"
     except Exception:  # noqa: BLE001
         pass
@@ -83,13 +121,14 @@ def detect_version(token: str) -> str:
 
 def _item_entity_type_id(token: str) -> str | None:
     """v2: 取一个 isLocation=false 的实体类型 id（默认物品类型）。"""
+    b, t = _resolve()
     h = {"Authorization": f"Bearer {token}"}
     try:
-        r = requests.get(f"{BASE}/api/v1/entity-types", headers=h, timeout=TIMEOUT, verify=False)
+        r = requests.get(f"{b}/api/v1/entity-types", headers=h, timeout=t, verify=False)
         if r.status_code == 200:
-            for t in r.json():
-                if not t.get("isLocation"):
-                    return t["id"]
+            for ty in r.json():
+                if not ty.get("isLocation"):
+                    return ty["id"]
     except Exception as e:  # noqa: BLE001
         log.warning("entity-types fetch failed: %s", e)
     return None
@@ -97,10 +136,11 @@ def _item_entity_type_id(token: str) -> str | None:
 
 def delete_item(token: str, item_id: str) -> bool:
     """删除实体/物品（v2 优先，回退 v1）。"""
+    b, t = _resolve()
     h = {"Authorization": f"Bearer {token}"}
     for path in (f"/api/v1/entities/{item_id}", f"/api/v1/items/{item_id}"):
         try:
-            r = requests.delete(f"{BASE}{path}", headers=h, timeout=TIMEOUT, verify=False)
+            r = requests.delete(f"{b}{path}", headers=h, timeout=t, verify=False)
             if r.status_code in (200, 204):
                 return True
         except requests.RequestException:
@@ -149,6 +189,7 @@ def _download_image(url: str) -> bytes | None:
 
 def _upload_image(token: str, entity_id: str, image_bytes: bytes, filename: str = "product.jpg") -> str | None:
     """上传图片到 Homebox 实体，返回 imageId。上传后触发缩略图生成。"""
+    b, t = _resolve()
     h = {"Authorization": f"Bearer {token}"}
     # 自动检测图片格式
     if image_bytes[:3] == b'\xff\xd8\xff':
@@ -162,18 +203,18 @@ def _upload_image(token: str, entity_id: str, image_bytes: bytes, filename: str 
     fname = f"product.{ext}"
     try:
         r = requests.post(
-            f"{BASE}/api/v1/entities/{entity_id}/attachments",
+            f"{b}/api/v1/entities/{entity_id}/attachments",
             headers=h,
             files={"file": (fname, io.BytesIO(image_bytes), mime)},
             data={"name": fname, "primary": "true"},
-            timeout=TIMEOUT,
+            timeout=t,
         )
         if r.status_code in (200, 201):
             image_id = (r.json() or {}).get("imageId")
             # 触发缩略图生成（后台异步，不等待完成）
             try:
                 requests.post(
-                    f"{BASE}/api/v1/actions/create-missing-thumbnails",
+                    f"{b}/api/v1/actions/create-missing-thumbnails",
                     headers=h, timeout=10,
                 )
             except Exception:  # noqa: BLE001
@@ -188,7 +229,8 @@ def add_item(token: str, product: dict, location_id: str | None = None, quantity
     """把商品写入 Homebox。返回 {ok, id?, error?}。quantity 为入库数量（默认 1）。"""
     if not token:
         return {"ok": False, "error": "no_homebox_token"}
-    # 优先使用前端传入的位置，其次用环境变量配置
+    b, t = _resolve()
+    # 优先使用前端传入的位置，其次用 docker-compose 里的默认位置（环境变量）
     loc = location_id or os.getenv("HOMEBOX_LOCATION_ID") or None
     version = detect_version(token)
     h = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
@@ -218,7 +260,7 @@ def add_item(token: str, product: dict, location_id: str | None = None, quantity
             payload["entityTypeId"] = type_id
         if loc:
             payload["parentId"] = loc
-        r = requests.post(f"{BASE}/api/v1/entities", json=payload, headers=h, timeout=TIMEOUT, verify=False)
+        r = requests.post(f"{b}/api/v1/entities", json=payload, headers=h, timeout=t, verify=False)
 
         if r.status_code not in (200, 201):
             return {"ok": False, "error": f"http_{r.status_code}", "detail": r.text[:300]}
@@ -244,8 +286,8 @@ def add_item(token: str, product: dict, location_id: str | None = None, quantity
             put_body["parentId"] = loc
 
         requests.put(
-            f"{BASE}/api/v1/entities/{entity_id}",
-            json=put_body, headers=h, timeout=TIMEOUT,
+            f"{b}/api/v1/entities/{entity_id}",
+            json=put_body, headers=h, timeout=t,
         )
 
         # 3. 下载并上传商品图片
@@ -268,7 +310,7 @@ def add_item(token: str, product: dict, location_id: str | None = None, quantity
         payload = {"name": product["name"], "description": description, "quantity": quantity}
         if loc:
             payload["locationId"] = loc
-        r = requests.post(f"{BASE}/api/v1/items", json=payload, headers=h, timeout=TIMEOUT, verify=False)
+        r = requests.post(f"{b}/api/v1/items", json=payload, headers=h, timeout=t, verify=False)
         if r.status_code in (200, 201):
             return {"ok": True, "id": (r.json() or {}).get("id"), "version": version}
         return {"ok": False, "error": f"http_{r.status_code}", "detail": r.text[:300]}

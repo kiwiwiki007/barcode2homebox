@@ -1,7 +1,7 @@
 services:
   barcode2homebox:
     # 公开镜像，来自 GitHub Container Registry，其他电脑可直接拉取部署（无需克隆/构建）
-    image: ghcr.io/wuqiyu007/barcode2homebox:latest
+    image: ghcr.io/kiwiwiki007/barcode2homebox:latest
     container_name: barcode2homebox
     restart: always
     environment:
